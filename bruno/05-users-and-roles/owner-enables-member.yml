@@ -1,0 +1,34 @@
+info:
+  name: "Owner re-enables the member"
+  type: http
+  seq: 13
+  tags:
+    - regression
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/auth/users/{{memberId}}/status"
+  body:
+    type: json
+    data: |-
+      {
+        "status": "active"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("member is active again", function () {
+          expect(res.body.user.status).to.equal('active');
+        });
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,30 @@
+info:
+  name: "Org A data is untouched after the cross-tenant attempts"
+  type: http
+  seq: 7
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/users"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("member is still active with the right role", function () {
+          const member = res.body.users.find((u) => u.id === bru.getVar('memberId'));
+          expect(member.status).to.equal('active');
+          expect(member.role).to.equal('member');
+        });
+
+settings:
+  encodeUrl: true

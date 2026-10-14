@@ -1,0 +1,43 @@
+info:
+  name: "Refresh rotates the token"
+  type: http
+  seq: 2
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: before-request
+      code: |-
+        req.setHeader('Cookie', 'refresh_token=' + bru.getVar('refreshR1'));
+    - type: after-response
+      code: |-
+        // The refresh cookie is captured and re-sent explicitly, so these tests do
+        // not depend on a cookie jar and can replay old tokens on purpose.
+        const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const cookie = list.find((c) => c.startsWith('refresh_token='));
+        bru.setVar('refreshR2', cookie ? cookie.split(';')[0].split('=')[1] : '');
+
+        bru.setVar('ownerAToken', res.body.accessToken);
+    - type: tests
+      code: |-
+        test("returns a new access token", function () {
+          expect(res.body.accessToken).to.be.a('string').and.not.empty;
+        });
+        test("issues a different refresh token", function () {
+          expect(bru.getVar('refreshR2')).to.be.a('string').and.not.empty;
+          expect(bru.getVar('refreshR2')).to.not.equal(bru.getVar('refreshR1'));
+        });
+
+settings:
+  encodeUrl: true

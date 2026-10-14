@@ -1,0 +1,25 @@
+info:
+  name: "Protected route without a token"
+  type: http
+  seq: 6
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/me"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns UNAUTHORIZED", function () {
+          expect(res.body.code).to.equal('UNAUTHORIZED');
+        });
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+.env
+.env.*
+*.log
+coverage
+bruno-collection
+docker-compose*.yml
+Dockerfile*
+README.md
+.vscode
+.idea

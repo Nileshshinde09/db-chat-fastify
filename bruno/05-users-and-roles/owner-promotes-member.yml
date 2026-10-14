@@ -1,0 +1,34 @@
+info:
+  name: "Owner promotes a member to admin"
+  type: http
+  seq: 5
+  tags:
+    - regression
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/auth/users/{{memberId}}/role"
+  body:
+    type: json
+    data: |-
+      {
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("role is now admin", function () {
+          expect(res.body.user.role).to.equal('admin');
+        });
+
+settings:
+  encodeUrl: true

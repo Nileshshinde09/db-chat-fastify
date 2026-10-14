@@ -1,0 +1,82 @@
+info:
+  name: "Register organization A (owner)"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Acme Inc {{runId}}",
+        "name": "Alice Owner",
+        "email": "{{ownerAEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: before-request
+      code: |-
+        // A unique run id keeps emails unique, so the suite can be re-run against the same database.
+        if (!bru.getVar('runId')) {
+          bru.setVar('runId', Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+        }
+        const id = bru.getVar('runId');
+        bru.setVar('ownerAEmail', 'owner-a-' + id + '@acme-test.com');
+        bru.setVar('adminEmail', 'admin-' + id + '@acme-test.com');
+        bru.setVar('memberEmail', 'member-' + id + '@acme-test.com');
+        bru.setVar('ownerBEmail', 'owner-b-' + id + '@globex-test.com');
+    - type: after-response
+      code: |-
+        // The refresh cookie is captured and re-sent explicitly, so these tests do
+        // not depend on a cookie jar and can replay old tokens on purpose.
+        const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const cookie = list.find((c) => c.startsWith('refresh_token='));
+        bru.setVar('ownerARefresh', cookie ? cookie.split(';')[0].split('=')[1] : '');
+
+        bru.setVar('ownerAToken', res.body.accessToken);
+        bru.setVar('ownerAId', res.body.user.id);
+        bru.setVar('orgAId', res.body.organization.id);
+    - type: tests
+      code: |-
+        test("creates the owner", function () {
+          expect(res.body.user.role).to.equal('owner');
+          expect(res.body.user.status).to.equal('active');
+          expect(res.body.user.email).to.equal(bru.getVar('ownerAEmail'));
+        });
+        test("creates the organization", function () {
+          expect(res.body.organization.slug).to.be.a('string').and.not.empty;
+          expect(res.body.organization.status).to.equal('active');
+        });
+        test("returns an access token", function () {
+          expect(res.body.accessToken).to.be.a('string').and.not.empty;
+        });
+        test("never leaks secrets", function () {
+          const text = JSON.stringify(res.body);
+          expect(text).to.not.contain('passwordHash');
+          expect(text).to.not.contain('secret');
+        });
+        test("sets an HttpOnly refresh cookie scoped to the auth path", function () {
+          const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+          const joined = Array.isArray(raw) ? raw.join(';') : String(raw);
+          expect(joined).to.contain('refresh_token=');
+          expect(joined).to.contain('HttpOnly');
+          expect(joined).to.contain('Path=/api/v1/auth');
+        });
+        test("2FA is off for a new account", function () {
+          expect(res.body.user.twoFactorEnabled).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,28 @@
+info:
+  name: "Reuse also revokes the legitimately rotated token"
+  type: http
+  seq: 4
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+  scripts:
+    - type: before-request
+      code: |-
+        req.setHeader('Cookie', 'refresh_token=' + bru.getVar('refreshR2'));
+    - type: tests
+      code: |-
+        test("the newer token no longer works", function () {
+          expect(res.body.code).to.be.oneOf(['TOKEN_REUSED', 'INVALID_REFRESH_TOKEN']);
+        });
+
+settings:
+  encodeUrl: true

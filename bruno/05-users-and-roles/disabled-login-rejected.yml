@@ -1,0 +1,32 @@
+info:
+  name: "Disabled user cannot log in"
+  type: http
+  seq: 12
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{memberEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+  scripts:
+    - type: tests
+      code: |-
+        test("looks like any other failed login", function () {
+          expect(res.body.code).to.equal('INVALID_CREDENTIALS');
+        });
+
+settings:
+  encodeUrl: true

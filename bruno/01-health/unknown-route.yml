@@ -1,0 +1,27 @@
+info:
+  name: "Unknown route returns consistent 404"
+  type: http
+  seq: 2
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/does-not-exist"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+  scripts:
+    - type: tests
+      code: |-
+        test("uses the standard error shape", function () {
+          expect(res.body).to.have.property('statusCode', 404);
+          expect(res.body).to.have.property('code', 'NOT_FOUND');
+          expect(res.body).to.have.property('message');
+        });
+
+settings:
+  encodeUrl: true

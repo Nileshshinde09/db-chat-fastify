@@ -1,0 +1,28 @@
+info:
+  name: "Revoking twice returns 404"
+  type: http
+  seq: 18
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/{{extraInviteId}}"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns NOT_FOUND", function () {
+          expect(res.body.code).to.equal('NOT_FOUND');
+        });
+
+settings:
+  encodeUrl: true

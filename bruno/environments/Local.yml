@@ -1,0 +1,6 @@
+
+variables:
+  - name: baseUrl
+    value: http://localhost:3000
+  - name: testPassword
+    value: Sup3r-secret-pw

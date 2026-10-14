@@ -1,0 +1,33 @@
+info:
+  name: "Accepting with an unknown token fails"
+  type: http
+  seq: 7
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "this-token-does-not-exist-this-token-does-not-exist",
+        "name": "Intruder",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns INVALID_INVITE", function () {
+          expect(res.body.code).to.equal('INVALID_INVITE');
+        });
+
+settings:
+  encodeUrl: true

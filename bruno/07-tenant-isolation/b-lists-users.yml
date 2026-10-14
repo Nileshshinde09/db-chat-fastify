@@ -1,0 +1,34 @@
+info:
+  name: "Org B only sees its own users"
+  type: http
+  seq: 2
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/users"
+  auth:
+    type: bearer
+    token: "{{ownerBToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns only org B's owner", function () {
+          const emails = res.body.users.map((u) => u.email);
+          expect(emails).to.deep.equal([bru.getVar('ownerBEmail')]);
+        });
+        test("no org A user leaks", function () {
+          const orgIds = new Set(res.body.users.map((u) => u.orgId));
+          expect(orgIds.has(bru.getVar('orgAId'))).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true

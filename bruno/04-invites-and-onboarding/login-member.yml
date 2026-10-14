@@ -1,0 +1,35 @@
+info:
+  name: "Onboarded employee can log in with email + password"
+  type: http
+  seq: 12
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{memberEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('memberToken', res.body.accessToken);
+    - type: tests
+      code: |-
+        test("returns the member", function () {
+          expect(res.body.user.role).to.equal('member');
+        });
+
+settings:
+  encodeUrl: true

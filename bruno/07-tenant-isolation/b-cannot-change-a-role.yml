@@ -1,0 +1,28 @@
+info:
+  name: "Org B cannot change an org A user's role"
+  type: http
+  seq: 5
+  tags:
+    - regression
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/auth/users/{{memberId}}/role"
+  body:
+    type: json
+    data: |-
+      {
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerBToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+
+settings:
+  encodeUrl: true

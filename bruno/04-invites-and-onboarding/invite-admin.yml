@@ -1,0 +1,47 @@
+info:
+  name: "Owner invites an admin"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{adminEmail}}",
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        const m = /token=([^&]+)/.exec(res.body.inviteLink || '');
+        bru.setVar('adminInviteToken', m ? m[1] : '');
+    - type: tests
+      code: |-
+        test("creates a pending admin invite", function () {
+          expect(res.body.invite.email).to.equal(bru.getVar('adminEmail'));
+          expect(res.body.invite.role).to.equal('admin');
+        });
+        test("returns the invite link outside production", function () {
+          expect(bru.getVar('adminInviteToken')).to.be.a('string').and.not.empty;
+        });
+        test("does not expose the token hash", function () {
+          expect(JSON.stringify(res.body)).to.not.contain('tokenHash');
+        });
+
+settings:
+  encodeUrl: true

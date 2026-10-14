@@ -1,0 +1,28 @@
+info:
+  name: "Admin cannot change roles"
+  type: http
+  seq: 4
+  tags:
+    - regression
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/auth/users/{{memberId}}/role"
+  body:
+    type: json
+    data: |-
+      {
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+
+settings:
+  encodeUrl: true

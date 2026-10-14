@@ -1,0 +1,39 @@
+info:
+  name: Health check
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/health"
+
+runtime:
+  variables:
+    - name: baseUrl
+      value: http://127.0.0.1:3000
+  scripts:
+    - type: tests
+      code: |-
+        test("returns status ok", function () {
+          expect(res.body.status).to.equal('ok');
+        });
+        test("sets security headers (helmet)", function () {
+          expect(res.getHeader('x-content-type-options')).to.equal('nosniff');
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.responseTime
+      operator: lt
+      value: "2000"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

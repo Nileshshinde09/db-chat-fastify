@@ -1,0 +1,38 @@
+info:
+  name: "Owner lists organization users"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/users"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns exactly the three org A users", function () {
+          const emails = res.body.users.map((u) => u.email).sort();
+          expect(emails).to.deep.equal([bru.getVar('adminEmail'), bru.getVar('memberEmail'), bru.getVar('ownerAEmail')].sort());
+        });
+        test("never exposes secrets", function () {
+          const text = JSON.stringify(res.body);
+          expect(text).to.not.contain('passwordHash');
+          expect(text).to.not.contain('"secret"');
+        });
+        test("there is exactly one owner", function () {
+          expect(res.body.users.filter((u) => u.role === 'owner')).to.have.length(1);
+        });
+
+settings:
+  encodeUrl: true

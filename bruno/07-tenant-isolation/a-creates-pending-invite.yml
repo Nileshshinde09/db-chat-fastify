@@ -1,0 +1,33 @@
+info:
+  name: "Org A creates a pending invite (isolation fixture)"
+  type: http
+  seq: 1
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "isolation-{{runId}}@acme-test.com",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('isolationInviteId', res.body.invite.id);
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,22 @@
+info:
+  name: "Malformed invite id is rejected"
+  type: http
+  seq: 19
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/not-an-object-id"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+
+settings:
+  encodeUrl: true

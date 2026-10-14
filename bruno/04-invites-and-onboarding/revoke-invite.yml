@@ -1,0 +1,22 @@
+info:
+  name: "Owner revokes a pending invite"
+  type: http
+  seq: 17
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/{{extraInviteId}}"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true

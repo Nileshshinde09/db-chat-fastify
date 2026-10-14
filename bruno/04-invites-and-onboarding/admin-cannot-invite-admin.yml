@@ -1,0 +1,35 @@
+info:
+  name: "Admin cannot invite another admin"
+  type: http
+  seq: 15
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "second-admin-{{runId}}@acme-test.com",
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns FORBIDDEN", function () {
+          expect(res.body.code).to.equal('FORBIDDEN');
+        });
+
+settings:
+  encodeUrl: true

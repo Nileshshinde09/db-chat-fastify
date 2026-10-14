@@ -1,0 +1,36 @@
+info:
+  name: "2FA setup is blocked while TWO_FACTOR_ENABLED=false"
+  type: http
+  seq: 8
+  tags:
+    - regression
+    - two-factor-off
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/2fa/setup"
+  body:
+    type: json
+    data: |-
+      {}
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns TWO_FACTOR_DISABLED", function () {
+          expect(res.body.code).to.equal('TWO_FACTOR_DISABLED');
+        });
+
+settings:
+  encodeUrl: true
+
+docs: |-
+  Only valid while the server runs with `TWO_FACTOR_ENABLED=false` (the dev default). Skip with `--exclude-tags=two-factor-off` when 2FA is on.

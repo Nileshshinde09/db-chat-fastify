@@ -1,0 +1,35 @@
+info:
+  name: "Invite with an invalid email"
+  type: http
+  seq: 3
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "nope",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns VALIDATION_ERROR", function () {
+          expect(res.body.code).to.equal('VALIDATION_ERROR');
+        });
+
+settings:
+  encodeUrl: true

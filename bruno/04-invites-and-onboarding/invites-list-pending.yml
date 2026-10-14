@@ -1,0 +1,32 @@
+info:
+  name: "List pending invites"
+  type: http
+  seq: 6
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("contains both pending invites", function () {
+          const emails = res.body.invites.map((i) => i.email);
+          expect(emails).to.include.members([bru.getVar('adminEmail'), bru.getVar('memberEmail')]);
+        });
+        test("does not expose token hashes", function () {
+          expect(JSON.stringify(res.body)).to.not.contain('tokenHash');
+        });
+
+settings:
+  encodeUrl: true

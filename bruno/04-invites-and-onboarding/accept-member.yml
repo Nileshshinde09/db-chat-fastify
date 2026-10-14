@@ -1,0 +1,38 @@
+info:
+  name: "Member accepts the invite and is logged in"
+  type: http
+  seq: 9
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "{{memberInviteToken}}",
+        "name": "Mia Member",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('memberToken', res.body.accessToken);
+        bru.setVar('memberId', res.body.user.id);
+    - type: tests
+      code: |-
+        test("joins organization A as a member", function () {
+          expect(res.body.user.role).to.equal('member');
+          expect(res.body.user.orgId).to.equal(bru.getVar('orgAId'));
+        });
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,33 @@
+info:
+  name: "Unknown email is indistinguishable from wrong password"
+  type: http
+  seq: 3
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "nobody-{{runId}}@acme-test.com",
+        "password": "definitely-the-wrong-password"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+  scripts:
+    - type: tests
+      code: |-
+        test("same error code and message as a wrong password (no email enumeration)", function () {
+          expect(res.body.code).to.equal('INVALID_CREDENTIALS');
+          expect(res.body.message).to.equal(bru.getVar('wrongPasswordMessage'));
+        });
+
+settings:
+  encodeUrl: true

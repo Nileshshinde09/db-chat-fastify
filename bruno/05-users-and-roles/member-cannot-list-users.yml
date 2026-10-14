@@ -1,0 +1,28 @@
+info:
+  name: "Member cannot list users"
+  type: http
+  seq: 3
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/users"
+  auth:
+    type: bearer
+    token: "{{memberToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns FORBIDDEN", function () {
+          expect(res.body.code).to.equal('FORBIDDEN');
+        });
+
+settings:
+  encodeUrl: true

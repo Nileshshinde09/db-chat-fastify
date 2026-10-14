@@ -1,0 +1,23 @@
+info:
+  name: "Refresh after logout fails"
+  type: http
+  seq: 8
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+  scripts:
+    - type: before-request
+      code: |-
+        req.setHeader('Cookie', 'refresh_token=' + bru.getVar('refreshR3'));
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,47 @@
+# docker-compose.yml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  backend:
+    build: ./backend
+    depends_on: [postgres]
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD}@postgres:5432/app
+
+  web:
+    build: ./web
+    depends_on: [backend]
+    ports: ["3000:3000"]
+    environment:
+      APPLICATION_BACKEND_URL: http://backend:8000
+
+  # 👇 test-only, opt-in
+  bruno:
+    image: node:20-alpine
+    profiles: ["test"]
+    working_dir: /bruno
+    volumes:
+      - ./bruno:/bruno
+      - ./bruno/results:/bruno/results
+    environment:
+      EMAIL: ${TEST_EMAIL}
+      PASSWORD: ${TEST_PASSWORD}
+    depends_on:
+      backend: { condition: service_started }
+      web:     { condition: service_started }
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      npm install -g @usebruno/cli --silent &&
+      bru run --env Docker --recursive
+        --env-var email=$${EMAIL}
+        --env-var password=$${PASSWORD}
+        --reporter-junit results/junit.xml
+
+volumes:
+  pgdata:

@@ -1,0 +1,30 @@
+info:
+  name: "Re-enabled member can log in again"
+  type: http
+  seq: 14
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{memberEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('memberToken', res.body.accessToken);
+
+settings:
+  encodeUrl: true

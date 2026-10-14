@@ -1,0 +1,42 @@
+info:
+  name: "Start a fresh session"
+  type: http
+  seq: 1
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{ownerAEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |-
+        // The refresh cookie is captured and re-sent explicitly, so these tests do
+        // not depend on a cookie jar and can replay old tokens on purpose.
+        const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const cookie = list.find((c) => c.startsWith('refresh_token='));
+        bru.setVar('refreshR1', cookie ? cookie.split(';')[0].split('=')[1] : '');
+
+        bru.setVar('ownerAToken', res.body.accessToken);
+    - type: tests
+      code: |-
+        test("issued a refresh token", function () {
+          expect(bru.getVar('refreshR1')).to.be.a('string').and.not.empty;
+        });
+
+settings:
+  encodeUrl: true

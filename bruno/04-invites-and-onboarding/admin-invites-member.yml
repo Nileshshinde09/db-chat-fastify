@@ -1,0 +1,38 @@
+info:
+  name: "Admin can invite a member"
+  type: http
+  seq: 16
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "extra-{{runId}}@acme-test.com",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('extraInviteId', res.body.invite.id);
+    - type: tests
+      code: |-
+        test("creates a member invite", function () {
+          expect(res.body.invite.role).to.equal('member');
+        });
+
+settings:
+  encodeUrl: true

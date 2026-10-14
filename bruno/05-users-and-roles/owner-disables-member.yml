@@ -1,0 +1,34 @@
+info:
+  name: "Owner disables a member"
+  type: http
+  seq: 10
+  tags:
+    - regression
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/api/v1/auth/users/{{memberId}}/status"
+  body:
+    type: json
+    data: |-
+      {
+        "status": "disabled"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("member is disabled", function () {
+          expect(res.body.user.status).to.equal('disabled');
+        });
+
+settings:
+  encodeUrl: true

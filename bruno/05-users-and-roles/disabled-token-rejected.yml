@@ -1,0 +1,22 @@
+info:
+  name: "Disabled user: existing access token stops working immediately"
+  type: http
+  seq: 11
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/me"
+  auth:
+    type: bearer
+    token: "{{memberToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+
+settings:
+  encodeUrl: true

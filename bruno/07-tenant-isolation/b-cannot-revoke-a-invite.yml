@@ -1,0 +1,22 @@
+info:
+  name: "Org B cannot revoke an org A invite"
+  type: http
+  seq: 6
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/{{isolationInviteId}}"
+  auth:
+    type: bearer
+    token: "{{ownerBToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+
+settings:
+  encodeUrl: true

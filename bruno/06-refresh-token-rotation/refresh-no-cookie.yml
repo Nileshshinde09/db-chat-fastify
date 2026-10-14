@@ -1,0 +1,28 @@
+info:
+  name: "Refresh without a cookie"
+  type: http
+  seq: 5
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+  scripts:
+    - type: before-request
+      code: |-
+        req.deleteHeader('Cookie');
+    - type: tests
+      code: |-
+        test("returns INVALID_REFRESH_TOKEN", function () {
+          expect(res.body.code).to.equal('INVALID_REFRESH_TOKEN');
+        });
+
+settings:
+  encodeUrl: true

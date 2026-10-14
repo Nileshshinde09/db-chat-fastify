@@ -1,0 +1,22 @@
+info:
+  name: "Member cannot list invites"
+  type: http
+  seq: 14
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  auth:
+    type: bearer
+    token: "{{memberToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,38 @@
+info:
+  name: "Register organization B (second tenant)"
+  type: http
+  seq: 2
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Globex Corp {{runId}}",
+        "name": "Bob Owner",
+        "email": "{{ownerBEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('ownerBToken', res.body.accessToken);
+        bru.setVar('orgBId', res.body.organization.id);
+    - type: tests
+      code: |-
+        test("is a different organization", function () {
+          expect(res.body.organization.id).to.not.equal(bru.getVar('orgAId'));
+        });
+
+settings:
+  encodeUrl: true

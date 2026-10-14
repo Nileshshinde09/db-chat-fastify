@@ -1,0 +1,34 @@
+info:
+  name: "Duplicate email is rejected"
+  type: http
+  seq: 3
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Another Org {{runId}}",
+        "name": "Mallory",
+        "email": "{{ownerAEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "409"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns EMAIL_TAKEN", function () {
+          expect(res.body.code).to.equal('EMAIL_TAKEN');
+        });
+
+settings:
+  encodeUrl: true

@@ -1,0 +1,35 @@
+info:
+  name: "Member cannot create invites"
+  type: http
+  seq: 13
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "x-{{runId}}@acme-test.com",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{memberToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns FORBIDDEN", function () {
+          expect(res.body.code).to.equal('FORBIDDEN');
+        });
+
+settings:
+  encodeUrl: true
