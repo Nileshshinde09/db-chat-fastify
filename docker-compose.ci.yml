@@ -1,0 +1,70 @@
+
+services:
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:1.24.0
+    environment:
+      FERRETDB_HANDLER: sqlite
+      FERRETDB_SQLITE_URL: file:/data/ferretdb.sqlite
+      FERRETDB_TELEMETRY: disable
+    volumes:
+      - ferretdb-data:/data
+    ports: ["27017:27017"]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          mongosh --quiet --eval "db.adminCommand('ping').ok" mongodb://localhost:27017/testdb
+          | grep -q 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  server:
+    build: ./server
+    depends_on:
+      ferretdb: { condition: service_healthy }
+    environment:
+      MONGO_URL: mongodb://ferretdb:27017/appdb
+      JWT_SECRET: ci-test-secret
+      NODE_ENV: test
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      server: { condition: service_healthy }
+    environment:
+      APPLICATION_BACKEND_URL: http://server:8000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    ports: ["3000:3000"]
+
+  bruno:
+    image: node:20-alpine
+    profiles: ["test"]
+    working_dir: /bruno
+    volumes:
+      - ./bruno:/bruno
+      - ./bruno/results:/bruno/results
+    environment:
+      EMAIL: ${TEST_EMAIL}
+      PASSWORD: ${TEST_PASSWORD}
+    depends_on:
+      server:   { condition: service_healthy }
+      frontend: { condition: service_started }
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      npm install -g @usebruno/cli --silent &&
+      bru run --env Docker --recursive
+        --env-var email=$${EMAIL}
+        --env-var password=$${PASSWORD}
+        --reporter-junit results/junit.xml
+        --reporter-html results/report.html
+
+volumes:
+  ferretdb-data:

@@ -1,54 +1,52 @@
-name: Bruno Regression Tests
+# .github/workflows/api-tests.yml
+name: API Tests
 
 on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
 
 jobs:
-  regression:
+  bruno-tests:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Create results directory
+        run: mkdir -p bruno/results
 
-      - name: Start FerretDB (SQLite) + Server stack
+      - name: Build images
+        run: docker compose -f docker-compose.ci.yml build --parallel
+
+      - name: Start stack
+        run: docker compose -f docker-compose.ci.yml up -d ferretdb server frontend
+
+      - name: Wait for server
         run: |
-          docker compose -f docker-compose.bruno.yml up -d --build
-          echo "Waiting for server to be healthy..."
-          timeout 90 bash -c '
-            until [ "$(docker inspect --format="{{.State.Health.Status}}" \
-              $(docker compose -f docker-compose.bruno.yml ps -q your-server))" = "healthy" ]; do
-              sleep 3
-            done
-          '
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 2
+          done
 
-      - name: Verify FerretDB connectivity
+      - name: Run Bruno tests
+        env:
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
         run: |
-          docker compose -f docker-compose.bruno.yml exec -T ferretdb \
-            sqlite3 /data/yourdb.sqlite ".tables" || echo "Database file will be created on first write"
+          docker compose -f docker-compose.ci.yml \
+            --profile test \
+            run --rm \
+            -e TEST_EMAIL="$TEST_EMAIL" \
+            -e TEST_PASSWORD="$TEST_PASSWORD" \
+            bruno
 
-      - name: Run Bruno CLI Regression Tests
-        uses: usebruno/bruno-cli-action@v1
-        with:
-          working-directory: ./bruno-collection
-          command: 'run --env ci --reporter-junit results.xml --reporter-html report.html'
-
-      - name: Upload Bruno Test Reports
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bruno-reports-${{ github.run_id }}
-          path: |
-            ./bruno-collection/results.xml
-            ./bruno-collection/report.html
+          name: bruno-reports
+          path: bruno/results/
 
-      - name: Tear Down Resources
+      - name: Tear down
         if: always()
-        run: |
-          docker compose -f docker-compose.bruno.yml down -v --remove-orphans
+        run: docker compose -f docker-compose.ci.yml down -v
