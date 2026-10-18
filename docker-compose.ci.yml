@@ -35,14 +35,14 @@ services:
       timeout: 3s
       retries: 20
 
-  frontend:
-    build: ./frontend
-    depends_on:
-      server: { condition: service_healthy }
-    environment:
-      APPLICATION_BACKEND_URL: http://server:8000
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-    ports: ["3000:3000"]
+  # frontend:
+  #   build: ./frontend
+  #   depends_on:
+  #     server: { condition: service_healthy }
+  #   environment:
+  #     APPLICATION_BACKEND_URL: http://server:8000
+  #     NEXT_PUBLIC_APP_URL: http://localhost:3000
+  #   ports: ["3000:3000"]
 
   bruno:
     image: node:20-alpine

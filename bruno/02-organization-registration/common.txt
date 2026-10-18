@@ -1,0 +1,223 @@
+info:
+  name: "Duplicate email is rejected"
+  type: http
+  seq: 3
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Another Org {{runId}}",
+        "name": "Mallory",
+        "email": "{{ownerAEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "409"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns EMAIL_TAKEN", function () {
+          expect(res.body.code).to.equal('EMAIL_TAKEN');
+        });
+
+settings:
+  encodeUrl: true
+info:
+  name: "Invalid payload returns a validation error"
+  type: http
+  seq: 4
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "x",
+        "email": "not-an-email",
+        "password": "123"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns VALIDATION_ERROR with issue paths", function () {
+          expect(res.body.code).to.equal('VALIDATION_ERROR');
+          const paths = res.body.issues.map((i) => i.path);
+          expect(paths).to.include.members(['organizationName', 'name', 'email', 'password']);
+        });
+
+settings:
+  encodeUrl: true
+info:
+  name: "Register organization A (owner)"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Acme Inc {{runId}}",
+        "name": "Alice Owner",
+        "email": "{{ownerAEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: before-request
+      code: |-
+        // A unique run id keeps emails unique, so the suite can be re-run against the same database.
+        if (!bru.getVar('runId')) {
+          bru.setVar('runId', Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+        }
+        const id = bru.getVar('runId');
+        bru.setVar('ownerAEmail', 'owner-a-' + id + '@acme-test.com');
+        bru.setVar('adminEmail', 'admin-' + id + '@acme-test.com');
+        bru.setVar('memberEmail', 'member-' + id + '@acme-test.com');
+        bru.setVar('ownerBEmail', 'owner-b-' + id + '@globex-test.com');
+    - type: after-response
+      code: |-
+        // The refresh cookie is captured and re-sent explicitly, so these tests do
+        // not depend on a cookie jar and can replay old tokens on purpose.
+        const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const cookie = list.find((c) => c.startsWith('refresh_token='));
+        bru.setVar('ownerARefresh', cookie ? cookie.split(';')[0].split('=')[1] : '');
+
+        bru.setVar('ownerAToken', res.body.accessToken);
+        bru.setVar('ownerAId', res.body.user.id);
+        bru.setVar('orgAId', res.body.organization.id);
+    - type: tests
+      code: |-
+        test("creates the owner", function () {
+          expect(res.body.user.role).to.equal('owner');
+          expect(res.body.user.status).to.equal('active');
+          expect(res.body.user.email).to.equal(bru.getVar('ownerAEmail'));
+        });
+        test("creates the organization", function () {
+          expect(res.body.organization.slug).to.be.a('string').and.not.empty;
+          expect(res.body.organization.status).to.equal('active');
+        });
+        test("returns an access token", function () {
+          expect(res.body.accessToken).to.be.a('string').and.not.empty;
+        });
+        test("never leaks secrets", function () {
+          const text = JSON.stringify(res.body);
+          expect(text).to.not.contain('passwordHash');
+          expect(text).to.not.contain('secret');
+        });
+        test("sets an HttpOnly refresh cookie scoped to the auth path", function () {
+          const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+          const joined = Array.isArray(raw) ? raw.join(';') : String(raw);
+          expect(joined).to.contain('refresh_token=');
+          expect(joined).to.contain('HttpOnly');
+          expect(joined).to.contain('Path=/api/v1/auth');
+        });
+        test("2FA is off for a new account", function () {
+          expect(res.body.user.twoFactorEnabled).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true
+info:
+  name: "Register organization B (second tenant)"
+  type: http
+  seq: 2
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Globex Corp {{runId}}",
+        "name": "Bob Owner",
+        "email": "{{ownerBEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('ownerBToken', res.body.accessToken);
+        bru.setVar('orgBId', res.body.organization.id);
+    - type: tests
+      code: |-
+        test("is a different organization", function () {
+          expect(res.body.organization.id).to.not.equal(bru.getVar('orgAId'));
+        });
+
+settings:
+  encodeUrl: true
+info:
+  name: "Weak password is rejected"
+  type: http
+  seq: 5
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/register-organization"
+  body:
+    type: json
+    data: |-
+      {
+        "organizationName": "Weak Org {{runId}}",
+        "name": "Weak",
+        "email": "weak-{{runId}}@acme-test.com",
+        "password": "short"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("flags the password field", function () {
+          expect(res.body.issues.map((i) => i.path)).to.include('password');
+        });
+
+settings:
+  encodeUrl: true

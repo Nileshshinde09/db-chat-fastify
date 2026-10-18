@@ -1,0 +1,32 @@
+info:
+  name: DB Clean
+  type: http
+  seq: 1
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/dev/db/clean"
+  body:
+    type: json
+    data: |-
+      {
+        "password": "Nilesh@9403"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
