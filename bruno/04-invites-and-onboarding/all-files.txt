@@ -1,0 +1,684 @@
+]633;E;for f in *\x3b do [ -f "$f" ] && { echo "===== $f ====="\x3b cat "$f"\x3b echo\x3b }\x3b done > all-files.txt;b4a372f5-3832-4267-bda4-e146a9357972]633;C===== accept-admin.yml =====
+info:
+  name: "Admin accepts the invite and is logged in"
+  type: http
+  seq: 8
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "{{adminInviteToken}}",
+        "name": "Adam Admin",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('adminToken', res.body.accessToken);
+        bru.setVar('adminId', res.body.user.id);
+    - type: tests
+      code: |-
+        test("joins organization A with the invited role", function () {
+          expect(res.body.user.role).to.equal('admin');
+          expect(res.body.user.orgId).to.equal(bru.getVar('orgAId'));
+          expect(res.body.organization.id).to.equal(bru.getVar('orgAId'));
+          expect(res.body.user.email).to.equal(bru.getVar('adminEmail'));
+        });
+
+settings:
+  encodeUrl: true
+
+===== accept-invalid-token.yml =====
+info:
+  name: "Accepting with an unknown token fails"
+  type: http
+  seq: 7
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "this-token-does-not-exist-this-token-does-not-exist",
+        "name": "Intruder",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns INVALID_INVITE", function () {
+          expect(res.body.code).to.equal('INVALID_INVITE');
+        });
+
+settings:
+  encodeUrl: true
+
+===== accept-member.yml =====
+info:
+  name: "Member accepts the invite and is logged in"
+  type: http
+  seq: 9
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "{{memberInviteToken}}",
+        "name": "Mia Member",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('memberToken', res.body.accessToken);
+        bru.setVar('memberId', res.body.user.id);
+    - type: tests
+      code: |-
+        test("joins organization A as a member", function () {
+          expect(res.body.user.role).to.equal('member');
+          expect(res.body.user.orgId).to.equal(bru.getVar('orgAId'));
+        });
+
+settings:
+  encodeUrl: true
+
+===== accept-replay.yml =====
+info:
+  name: "An invite can only be used once"
+  type: http
+  seq: 10
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "{{adminInviteToken}}",
+        "name": "Replay Attacker",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns INVALID_INVITE", function () {
+          expect(res.body.code).to.equal('INVALID_INVITE');
+        });
+
+settings:
+  encodeUrl: true
+
+===== accept-weak-password.yml =====
+info:
+  name: "Accept validates the password policy"
+  type: http
+  seq: 11
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites/accept"
+  body:
+    type: json
+    data: |-
+      {
+        "token": "{{memberInviteToken}}",
+        "name": "Mia Member",
+        "password": "short"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("flags the password field", function () {
+          expect(res.body.issues.map((i) => i.path)).to.include('password');
+        });
+
+settings:
+  encodeUrl: true
+
+===== admin-cannot-invite-admin.yml =====
+info:
+  name: "Admin cannot invite another admin"
+  type: http
+  seq: 15
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "second-admin-{{runId}}@acme-test.com",
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns FORBIDDEN", function () {
+          expect(res.body.code).to.equal('FORBIDDEN');
+        });
+
+settings:
+  encodeUrl: true
+
+===== admin-invites-member.yml =====
+info:
+  name: "Admin can invite a member"
+  type: http
+  seq: 16
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "extra-{{runId}}@acme-test.com",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('extraInviteId', res.body.invite.id);
+    - type: tests
+      code: |-
+        test("creates a member invite", function () {
+          expect(res.body.invite.role).to.equal('member');
+        });
+
+settings:
+  encodeUrl: true
+
+===== all-files.txt =====
+
+===== folder.yml =====
+info:
+  name: Invites & employee onboarding
+  type: folder
+  seq: 4
+
+===== invite-admin.yml =====
+info:
+  name: "Owner invites an admin"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{adminEmail}}",
+        "role": "admin"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        const m = /token=([^&]+)/.exec(res.body.inviteLink || '');
+        bru.setVar('adminInviteToken', m ? m[1] : '');
+    - type: tests
+      code: |-
+        test("creates a pending admin invite", function () {
+          expect(res.body.invite.email).to.equal(bru.getVar('adminEmail'));
+          expect(res.body.invite.role).to.equal('admin');
+        });
+        test("returns the invite link outside production", function () {
+          expect(bru.getVar('adminInviteToken')).to.be.a('string').and.not.empty;
+        });
+        test("does not expose the token hash", function () {
+          expect(JSON.stringify(res.body)).to.not.contain('tokenHash');
+        });
+
+settings:
+  encodeUrl: true
+
+===== invite-existing-user.yml =====
+info:
+  name: "Cannot invite an email that already has an account"
+  type: http
+  seq: 5
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{ownerAEmail}}",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "409"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns EMAIL_TAKEN", function () {
+          expect(res.body.code).to.equal('EMAIL_TAKEN');
+        });
+
+settings:
+  encodeUrl: true
+
+===== invite-invalid-email.yml =====
+info:
+  name: "Invite with an invalid email"
+  type: http
+  seq: 3
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "nope",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns VALIDATION_ERROR", function () {
+          expect(res.body.code).to.equal('VALIDATION_ERROR');
+        });
+
+settings:
+  encodeUrl: true
+
+===== invite-member.yml =====
+info:
+  name: "Owner invites a member"
+  type: http
+  seq: 2
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{memberEmail}}",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: after-response
+      code: |-
+        const m = /token=([^&]+)/.exec(res.body.inviteLink || '');
+        bru.setVar('memberInviteToken', m ? m[1] : '');
+    - type: tests
+      code: |-
+        test("creates a pending member invite", function () {
+          expect(res.body.invite.role).to.equal('member');
+        });
+
+settings:
+  encodeUrl: true
+
+===== invite-owner-role-rejected.yml =====
+info:
+  name: "Cannot invite someone as owner"
+  type: http
+  seq: 4
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "wannabe-owner-{{runId}}@acme-test.com",
+        "role": "owner"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns VALIDATION_ERROR", function () {
+          expect(res.body.code).to.equal('VALIDATION_ERROR');
+        });
+
+settings:
+  encodeUrl: true
+
+===== invites-list-pending.yml =====
+info:
+  name: "List pending invites"
+  type: http
+  seq: 6
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("contains both pending invites", function () {
+          const emails = res.body.invites.map((i) => i.email);
+          expect(emails).to.include.members([bru.getVar('adminEmail'), bru.getVar('memberEmail')]);
+        });
+        test("does not expose token hashes", function () {
+          expect(JSON.stringify(res.body)).to.not.contain('tokenHash');
+        });
+
+settings:
+  encodeUrl: true
+
+===== login-member.yml =====
+info:
+  name: "Onboarded employee can log in with email + password"
+  type: http
+  seq: 12
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{memberEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar('memberToken', res.body.accessToken);
+    - type: tests
+      code: |-
+        test("returns the member", function () {
+          expect(res.body.user.role).to.equal('member');
+        });
+
+settings:
+  encodeUrl: true
+
+===== member-cannot-invite.yml =====
+info:
+  name: "Member cannot create invites"
+  type: http
+  seq: 13
+  tags:
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "x-{{runId}}@acme-test.com",
+        "role": "member"
+      }
+  auth:
+    type: bearer
+    token: "{{memberToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns FORBIDDEN", function () {
+          expect(res.body.code).to.equal('FORBIDDEN');
+        });
+
+settings:
+  encodeUrl: true
+
+===== member-cannot-list-invites.yml =====
+info:
+  name: "Member cannot list invites"
+  type: http
+  seq: 14
+  tags:
+    - regression
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/auth/invites"
+  auth:
+    type: bearer
+    token: "{{memberToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+
+settings:
+  encodeUrl: true
+
+===== revoke-invalid-id.yml =====
+info:
+  name: "Malformed invite id is rejected"
+  type: http
+  seq: 19
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/not-an-object-id"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+
+settings:
+  encodeUrl: true
+
+===== revoke-invite.yml =====
+info:
+  name: "Owner revokes a pending invite"
+  type: http
+  seq: 17
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/{{extraInviteId}}"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true
+
+===== revoke-invite-again.yml =====
+info:
+  name: "Revoking twice returns 404"
+  type: http
+  seq: 18
+  tags:
+    - regression
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/auth/invites/{{extraInviteId}}"
+  auth:
+    type: bearer
+    token: "{{ownerAToken}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+  scripts:
+    - type: tests
+      code: |-
+        test("returns NOT_FOUND", function () {
+          expect(res.body.code).to.equal('NOT_FOUND');
+        });
+
+settings:
+  encodeUrl: true
+

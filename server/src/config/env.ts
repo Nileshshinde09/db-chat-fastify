@@ -29,8 +29,8 @@ const schema = z
       .default("false")
       .transform((v) => v === "true"),
 
-    CORS_ORIGIN: z.string().default("http://localhost:5173"),
-    APP_URL: z.string().default("http://localhost:5173"),
+    CORS_ORIGIN: z.string().default("http://localhost:3000"),
+    APP_URL: z.string().default("http://localhost:3000"),
   })
   .superRefine((val, ctx) => {
     // Prod must never ship the dev-clean password.
