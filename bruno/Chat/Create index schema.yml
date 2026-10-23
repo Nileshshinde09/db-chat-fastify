@@ -1,0 +1,29 @@
+info:
+  name: Create index schema
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: http://localhost:8000/api/v1/schema/index
+  headers:
+    - name: x-user-id
+      value: 6ad63673a28566425b822f0f
+    - name: x-organization-id
+      value: 6ad63672a28566425b822f0e
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+          "connectionId": "6ad8e4e8c324b832d791c62d"
+        }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

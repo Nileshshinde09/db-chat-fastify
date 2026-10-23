@@ -1,0 +1,28 @@
+info:
+  name: EDIT Report
+  type: http
+  seq: 10
+
+http:
+  method: PATCH
+  url: http://localhost:8000/api/v1/reports/rpt_c4eb260433214668
+  headers:
+    - name: authorization
+      value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YWQ2MzY3M2EyODU2NjQyNWI4MjJmMGYiLCJvcmdJZCI6IjZhZDYzNjcyYTI4NTY2NDI1YjgyMmYwZSIsInJvbGUiOiJvd25lciIsImlhdCI6MTc5MjY4ODE4NCwiZXhwIjoxNzkyNjg5MDg0fQ.qzk3V1OXpDbvTtm8tv5qM_-skFdxKXBfZpX2vuYWj4o
+    - name: content-type
+      value: application/json
+    - name: X-User-Id
+      value: 6ad63673a28566425b822f0f
+    - name: X-Organization-Id
+      value: 6ad63672a28566425b822f0e
+  body:
+    type: json
+    data: '{"format":"xlsx"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

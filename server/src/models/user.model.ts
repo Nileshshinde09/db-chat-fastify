@@ -1,9 +1,9 @@
-import { Schema, model, type Types } from 'mongoose';
+import { Schema, model, type Types } from "mongoose";
 
-export const ROLES = ['owner', 'admin', 'member'] as const;
+export const ROLES = ["owner", "admin", "member"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const USER_STATUSES = ['active', 'disabled'] as const;
+export const USER_STATUSES = ["active", "disabled"] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
 export interface IUser {
@@ -25,14 +25,25 @@ export interface IUser {
 
 const userSchema = new Schema<IUser>(
   {
-    orgId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     // Email is globally unique: a user belongs to exactly one organization,
     // and login only needs email + password.
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     name: { type: String, required: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, required: true },
-    status: { type: String, enum: USER_STATUSES, default: 'active' },
+    status: { type: String, enum: USER_STATUSES, default: "active" },
     lastLoginAt: { type: Date },
     twoFactor: {
       enabled: { type: Boolean, default: false },
@@ -42,4 +53,4 @@ const userSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
-export const User = model<IUser>('User', userSchema);
+export const User = model<IUser>("User", userSchema);

@@ -31,6 +31,39 @@ const schema = z
 
     CORS_ORIGIN: z.string().default("http://localhost:3000"),
     APP_URL: z.string().default("http://localhost:3000"),
+
+    // --- Database connections & chat ---
+    // 32 random bytes, base64. Encrypts stored database passwords (AES-256-GCM).
+    ENCRYPTION_KEY: z
+      .string()
+      .refine(
+        (v) => Buffer.from(v, "base64").length === 32,
+        "ENCRYPTION_KEY must be 32 bytes, base64-encoded",
+      ),
+    // Signs the short-lived download URLs handed to the LLM server for uploaded files.
+    FILE_SIGNING_SECRET: z
+      .string()
+      .min(32, "FILE_SIGNING_SECRET must be at least 32 characters"),
+
+    // "mock" = built-in fake LLM (development/tests), "http" = the FastAPI LLM server.
+    LLM_SERVER_MODE: z.enum(["mock", "http"]).default("http"),
+    LLM_SERVER_URL: z.string().url().optional().default("http://127.0.0.1:8000"),
+    LLM_SERVER_API_KEY: z.string().min(16).optional().default(""),
+    LLM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+    // How the LLM server reaches THIS service to download uploaded files.
+    INTERNAL_BASE_URL: z.string().url().default("http://localhost:3000"),
+
+    UPLOAD_DIR: z.string().default("./uploads"),
+    MAX_UPLOAD_MB: z.coerce.number().positive().default(10),
+    CHAT_HISTORY_LIMIT: z.coerce.number().int().positive().default(20),
+    CHAT_ROW_LIMIT: z.coerce.number().int().positive().default(1000),
+    CHAT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
+    UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+    // Rejects localhost / private IP literals when users add database connections.
+    BLOCK_PRIVATE_HOSTS: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
   })
   .superRefine((val, ctx) => {
     // Prod must never ship the dev-clean password.

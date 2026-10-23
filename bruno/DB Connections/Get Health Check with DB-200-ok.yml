@@ -1,0 +1,31 @@
+info:
+  name: Get Health Check with DB-200-ok
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: http://127.0.0.1:8000/api/v1/connection/test
+  body:
+    type: json
+    data: |-
+      {
+        "connection": {
+          "type": "mongodb",
+          "host": "localhost",
+          "port": 27017,
+          "database": "database-chat",
+          "username": "",
+          "password": "",
+          "ssl": false,
+          "options": {}
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

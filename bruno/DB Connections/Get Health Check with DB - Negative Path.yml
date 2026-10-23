@@ -1,0 +1,31 @@
+info:
+  name: Get Health Check with DB - Negative Path
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: http://127.0.0.1:8000/api/v1/connection/test
+  body:
+    type: json
+    data: |-
+      {
+        "connection": {
+          "type": "mongodb",
+          "host": "localhost",
+          "port": 27018,
+          "database": "admin",
+          "username": "",
+          "password": "",
+          "ssl": false,
+          "options": {}
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

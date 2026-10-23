@@ -8,6 +8,12 @@ import inviteRoutes from "./modules/invites/invites.routes";
 import userRoutes from "./modules/users/users.routes";
 import { AppError } from "./utils/errors";
 import devDbCleanRoutes from "./modules/dev/dbClean";
+import connectionRoutes from "./modules/connections/connections.routes";
+import conversationRoutes from "./modules/chat/conversations.routes";
+import attachmentRoutes from "./modules/chat/attachments.routes";
+import internalFileRoutes from "./modules/internal/files.routes";
+import { createLlmClient } from "./services/llm";
+import reportRoutes from "./modules/reports/reports.routes";
 
 interface ErrorLike {
   statusCode?: number;
@@ -46,13 +52,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
 
     if (error instanceof AppError) {
-      return reply
-        .status(error.statusCode)
-        .send({
-          statusCode: error.statusCode,
-          code: error.code,
-          message: error.message,
-        });
+      return reply.status(error.statusCode).send({
+        statusCode: error.statusCode,
+        code: error.code,
+        message: error.message,
+      });
     }
 
     const err = error as ErrorLike;
@@ -85,16 +89,22 @@ export async function buildApp(): Promise<FastifyInstance> {
       message: err.message ?? "Request failed",
     });
   });
-
+  app.decorate("llm", createLlmClient());
   await app.register(securityPlugin);
   await app.register(authPlugin);
-
   await app.register(authRoutes, { prefix: "/api/v1/auth" });
   await app.register(inviteRoutes, { prefix: "/api/v1/auth/invites" });
   await app.register(userRoutes, { prefix: "/api/v1/auth/users" });
   if (devToolsEnabled) {
     await app.register(devDbCleanRoutes, { prefix: "/api/dev/db/clean" });
   }
+  // Database connections, chat workspace and files
+    await app.register(reportRoutes, { prefix: "/api/v1/reports" });
+  await app.register(connectionRoutes, { prefix: "/api/v1/connections" });
+  await app.register(conversationRoutes, { prefix: "/api/v1/conversations" });
+  await app.register(attachmentRoutes, { prefix: "/api/v1/attachments" });
+  await app.register(internalFileRoutes, { prefix: "/api/v1/internal" });
+
   app.get("/health", async () => ({ status: "ok" }));
 
   return app;

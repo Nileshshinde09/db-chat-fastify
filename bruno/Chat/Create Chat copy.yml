@@ -1,0 +1,33 @@
+info:
+  name: Create Chat copy
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:8000/api/v1/chat?content-type=application/json
+  headers:
+    - name: X-User-Id
+      value: 6ad63673a28566425b822f0f
+    - name: X-Organization-Id
+      value: 6ad63672a28566425b822f0e
+  params:
+    - name: content-type
+      value: application/json
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+          "threadId": "t1",
+          "connectionId": "6ad8e4e8c324b832d791c62d",
+          "message": "give me list of users"
+        }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

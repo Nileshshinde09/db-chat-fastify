@@ -1,29 +1,23 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app';
-import { connectDb, disconnectDb } from '../src/config/db';
+import { clearDb, startTestDb, stopTestDb } from './helpers';
 
-let mongod: MongoMemoryServer;
 let app: FastifyInstance;
 
 beforeAll(async () => {
-  mongod = await MongoMemoryServer.create();
-  await connectDb(mongod.getUri());
+  await startTestDb();
   app = await buildApp();
   await app.ready();
 });
 
 afterAll(async () => {
   await app.close();
-  await disconnectDb();
-  await mongod.stop();
+  await stopTestDb();
 });
 
 beforeEach(async () => {
-  const collections = await mongoose.connection.db!.collections();
-  await Promise.all(collections.map((c) => c.deleteMany({})));
+  await clearDb();
 });
 
 const PASSWORD = 'Sup3r-secret-pw';
