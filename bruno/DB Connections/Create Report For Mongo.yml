@@ -23,16 +23,17 @@ http:
         "orgId": "6ad63672a28566425b822f0e",
         "userId": "6ad63673a28566425b822f0f",
         "query": {
-          "collection": "database-chat.organizations",
-          "operation": "find",
-          "filter": {},
-          "projection": {
-            "ownerId": 1,
-            "_id": 1
-          },
-          "sort": {},
-          "limit": 500
-        },
+                "type": "plan",
+                "plan": {
+                  "operation": "find",
+                  "collection": "organizations",
+                  "filter": {},
+                  "projection": {
+                    "name": 1
+                  },
+                  "limit": 500
+                }
+              },
           "format": "csv",
           "title": "Users"
       }

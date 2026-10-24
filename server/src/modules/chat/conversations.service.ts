@@ -86,6 +86,10 @@ export async function listConversations(
     userId: actor.sub,
     archived: query.archived,
   };
+    if (query.connectionId) {
+    filter.connectionId = query.connectionId;
+  }
+
   if (query.pinned !== undefined) filter.pinned = query.pinned;
   if (query.q) filter.title = { $regex: escapeRegex(query.q), $options: "i" };
   if (query.cursor) {

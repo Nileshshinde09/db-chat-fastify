@@ -8,7 +8,7 @@ http:
   url: "{{baseUrl}}/api/v1/conversations"
   headers:
     - name: authorization
-      value: Bearer      {{accessToken}}
+      value: Bearer {{accessToken}}
   body:
     type: json
     data: '{"connectionId":"6ad8e4e8c324b832d791c62d"}'

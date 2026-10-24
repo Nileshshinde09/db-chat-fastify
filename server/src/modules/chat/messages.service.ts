@@ -314,6 +314,7 @@ export async function prepareChat(
             safeEmit({ event: "delta", data: { text: ev.text } });
           } else if (
             ev.type === "sql" ||
+            ev.type === "plan" ||
             ev.type === "table" ||
             ev.type === "chart"
           ) {

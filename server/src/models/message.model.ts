@@ -5,7 +5,7 @@ export type MessageStatus = "complete" | "stopped" | "error";
 
 /** Structured output produced next to the text: generated SQL, result tables, chart specs. */
 export type MessageBlock = {
-  type: "sql" | "table" | "chart";
+  type: "sql" | "plan"| "table" | "chart";
   [key: string]: unknown;
 };
 

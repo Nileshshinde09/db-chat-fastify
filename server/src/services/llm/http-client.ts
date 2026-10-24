@@ -206,12 +206,19 @@ export class HttpLlmClient implements LlmClient {
     if (signal.aborted) return;
 
     // 1. Synthesize the SQL block (if the LLM generated a query)
-    if (data.query) {
-      yield {
-        type: "sql",
-        sql: typeof data.query === "string" ? data.query : JSON.stringify(data.query),
-        dialect: data.query_kind,
-      };
+      if (data.query) {
+      if (data.query_kind === "plan") {
+        yield {
+          type: "plan",
+          plan: data.query,
+        };
+      } else {
+        yield {
+          type: "sql",
+          sql: String(data.query),
+          dialect: data.query_kind,
+        };
+      }
     }
 
     // 2. Synthesize the text answer (yielded as one large delta)

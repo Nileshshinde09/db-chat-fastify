@@ -13,8 +13,8 @@ http:
     type: json
     data: |-
       {
-        "email": "{{ownerAEmail}}",
-        "password": "{{testPassword}}"
+        "email": "nilesh@gmail.com",
+        "password": "Nilesh@9403"
       }
 
 runtime:
@@ -46,6 +46,15 @@ runtime:
     - expression: res.status
       operator: eq
       value: "200"
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body["accessToken"]
+        method: jsonq
+      variable:
+        name: accessToken
+        scope: runtime
 
 settings:
   encodeUrl: true

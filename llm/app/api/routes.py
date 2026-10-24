@@ -1,6 +1,6 @@
 import logging
 from typing import Annotated, Literal
-
+from app.services.history_loader import get_chat_history
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.mongodb import MongoDBSaver
@@ -64,7 +64,6 @@ async def index_connection_schema(
     return {"indexed_objects": count, "connection_id": body.connection_id}
 
 
-# ═══════════════════════════════════════════════════════════════════════════
 @router.post("/chat")
 async def chat(
     body: ChatRequest,
@@ -80,7 +79,18 @@ async def chat(
 
     db_type = cfg.type
 
-    # ── If editing, load the current plan for context ───────────────────
+    # ── 1. Load Chat History from Mongo (The "No-Wiring" approach) ──────
+    # This fetches the last 10 messages from Fastify's Mongo collection
+    history_messages = await get_chat_history(
+        request.app.state.mongodb, 
+        body.thread_id, 
+        limit=10
+    )
+    
+    # Append the NEW message to the history
+    history_messages.append(HumanMessage(content=body.message))
+
+    # ── 2. If editing, load the current plan for context ────────────────
     current_query: dict | str | None = None
     is_edit = False
     if body.report_id:
@@ -90,7 +100,7 @@ async def chat(
         current_query = doc.get("query")
         is_edit = True
 
-    # ── Plain instantiation — MongoDBSaver is NOT a context manager ─────
+    # ── 3. Setup Graph & Checkpointer ───────────────────────────────────
     checkpointer = MongoDBSaver(
         request.app.state.checkpoint_client,
         db_name=request.app.state.checkpoint_db.name,
@@ -104,8 +114,9 @@ async def chat(
         }
     }
 
+    # ── 4. Initial State (Passing the full history) ─────────────────────
     initial_state = {
-        "messages": [HumanMessage(content=body.message)],
+        "messages": history_messages,  # 🟢 THE FIX: Pass the full history here
         "organization_id": user.organization_id,
         "user_id": user.user_id,
         "connection_id": body.connection_id,
@@ -122,6 +133,10 @@ async def chat(
         "final_answer": "",
         "current_query": current_query,
         "is_edit": is_edit,
+        # (Optional) Pass the last query if you want to support the "edit_node" fallback
+        "last_query": None, 
+        "last_query_kind": "",
+        "is_refinement": False,
     }
 
     try:
@@ -147,7 +162,6 @@ async def chat(
         "report_id": body.report_id,
         "is_edit": is_edit,
     }
-
 # ═══════════════════════════════════════════════════════════════════════════
 @router.post(
     "/connections/test",

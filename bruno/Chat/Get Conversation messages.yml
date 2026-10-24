@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/v1/conversations/6adc452590c7b7e60b63e22c"
+  url: "{{baseUrl}}/api/v1/conversations/6adc452590c7b7e60b63e22c/messages"
   headers:
     - name: authorization
       value: Bearer {{accessToken}}

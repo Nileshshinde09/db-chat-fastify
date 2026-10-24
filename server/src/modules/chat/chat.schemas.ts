@@ -24,6 +24,7 @@ export const updateConversationSchema = z
 export const listConversationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
   cursor: z.string().max(200).optional(),
+  connectionId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id').optional(),
   q: z.string().trim().max(100).optional(),
   archived: z
     .enum(['true', 'false'])

@@ -39,7 +39,7 @@ export interface LlmChatRequest {
 
 export type LlmEvent =
   | { type: 'delta'; text: string }
-  | { type: 'sql'; sql: string; dialect?: string }
+  | { type: 'plan'; plan: string | Record<string, unknown> }
   | { type: 'table'; columns: string[]; rows: unknown[][]; rowCount?: number; truncated?: boolean; title?: string }
   | { type: 'chart'; spec: Record<string, unknown> }
   | { type: 'title'; title: string }

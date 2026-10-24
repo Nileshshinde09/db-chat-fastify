@@ -15,7 +15,7 @@ http:
       type: query
   body:
     type: json
-    data: '{"content": "what is my last query asked?"}'
+    data: '{"content": "give me list of company names."}'
   auth: inherit
 
 settings:

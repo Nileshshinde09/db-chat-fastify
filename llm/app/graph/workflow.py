@@ -1,10 +1,8 @@
 import json
 import logging
-
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END
-
 from app.agents.database_agents import (
     generate_mongo_plan,
     generate_sql,
@@ -20,31 +18,67 @@ from app.rag.retriever import retrieve_schema
 from app.services.connection_loader import load_connection
 from app.services.db_executor import ExecutionError
 from app.services.mongo_executor import execute_mongo
-
 logger = logging.getLogger(__name__)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Nodes
 # ═══════════════════════════════════════════════════════════════════════════
 def route_node(state: ChatState) -> dict:
+    last_message = state["messages"][-1].content.lower()
+    
+    # 1. Aggressive Python-level interceptor for Meta/Schema questions
+    meta_keywords = [
+        "ask", "asked", "conversation", "table", "tables", 
+        "schema", "column", "columns", "previous", "last query",
+        "how many rows", "how many records"
+    ]
+    # Default state to clear old queries
+    base_update = {
+        "wants_report": False,
+        "mongo_plan": {},           # 🟢 Clear old plan
+        "generated_query": "",      # 🟢 Clear old query
+        "query_error": "",          # 🟢 Clear old errors
+        "query_result": {},         # 🟢 Clear old results
+    }
+    
+    if any(kw in last_message for kw in meta_keywords):
+        return {
+            **base_update,
+            "intent": "meta",
+        }
+
+    # Otherwise, let the LLM router decide
     decision = route_message(
         state["messages"][-1].content,
         state["database_type"],
     )
     return {
+        **base_update,
         "intent": decision.intent,
         "wants_report": decision.wants_report,
     }
 
 
 def after_route(state: ChatState) -> str:
-    # Editing an existing report → skip schema retrieval, go straight to edit
     if state.get("is_edit"):
         return "edit"
+        
+    # 🟢 FIX 2: Send "meta" questions straight to the general chat node
+    if state.get("intent") == "meta":
+        return "general"
+        
     if state["intent"] == "database_query":
         return "retrieve_schema"
+        
     return "general"
+
+
+def general_node(state: ChatState) -> dict:
+    # 🟢 FIX 3: The general node now has the full history in state["messages"]
+    # and can accurately answer "what was my last query?"
+    response = router_llm.invoke(state["messages"])
+    answer = response.content if isinstance(response.content, str) else str(response.content)
+    return {"final_answer": answer, "messages": [AIMessage(content=answer)]}
 
 
 def retrieve_node(state: ChatState) -> dict:
