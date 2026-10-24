@@ -26,12 +26,12 @@ const eventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("chart"),
-    spec: z.record(z.string(), z.unknown()), // <-- Fixed
+    spec: z.record(z.string(), z.unknown()),
   }),
   z.object({ type: z.literal("title"), title: z.string() }),
   z.object({
     type: z.literal("done"),
-    usage: z.record(z.string(), z.unknown()).optional(), // <-- Fixed
+    usage: z.record(z.string(), z.unknown()).optional(),
   }),
   z.object({
     type: z.literal("error"),
@@ -40,10 +40,6 @@ const eventSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-/**
- * Incrementally parses a Server-Sent-Events byte stream into the JSON payloads
- * of its `data:` lines. Comments (": ping") and unknown fields are ignored.
- */
 export async function* parseSse(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<string> {
@@ -56,7 +52,6 @@ export async function* parseSse(
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let idx: number;
-      // An SSE event ends with a blank line (\n\n or \r\n\r\n)
       while ((idx = buffer.search(/\r?\n\r?\n/)) !== -1) {
         const raw = buffer.slice(0, idx);
         buffer = buffer.slice(idx).replace(/^\r?\n\r?\n/, "");
@@ -159,16 +154,28 @@ export class HttpLlmClient implements LlmClient {
     return (await res.json()) as T;
   }
 
+  // ── Chat Bridge ───────────────────────────────────────────────────────
+  // FastAPI returns a single JSON response. We synthesize SSE events
+  // so the Fastify messages.service.ts works without modification.
   async *streamChat(
     req: LlmChatRequest,
     signal: AbortSignal,
   ): AsyncGenerator<LlmEvent> {
     let res: Response;
     try {
-      res = await this.fetchImpl(`${this.base}/v1/chat/stream`, {
+      res = await this.fetchImpl(`${this.base}/api/v1/chat`, {
         method: "POST",
-        headers: this.headers({ accept: "text/event-stream" }),
-        body: JSON.stringify(req),
+        headers: this.headers({
+          "x-user-id": req.userId,               // FastAPI auth stub
+          "x-organization-id": req.orgId,        // FastAPI auth stub
+        }),
+        body: JSON.stringify({
+          threadId: req.conversationId,          // maps to FastAPI threadId
+          connectionId: req.connection?.id ?? "unknown",
+          message: req.messages[req.messages.length - 1]?.content ?? "",
+          connection: req.connection,            // full config with decrypted password
+          reportId: req.reportId,                // optional: for editing
+        }),
         signal: this.withTimeout(signal),
       });
     } catch (err) {
@@ -178,7 +185,8 @@ export class HttpLlmClient implements LlmClient {
         `Could not reach the LLM server: ${(err as Error).message}`,
       );
     }
-    if (!res.ok || !res.body) {
+
+    if (!res.ok) {
       throw new LlmError(
         "LLM_UPSTREAM_ERROR",
         await readError(res),
@@ -186,59 +194,82 @@ export class HttpLlmClient implements LlmClient {
       );
     }
 
-    let sawDone = false;
-    try {
-      for await (const data of parseSse(res.body)) {
-        let json: unknown;
-        try {
-          json = JSON.parse(data);
-        } catch {
-          continue; // ignore malformed lines instead of failing the whole answer
-        }
-        const parsed = eventSchema.safeParse(json);
-        if (!parsed.success) continue; // unknown event types are ignored (forward compatible)
-        yield parsed.data as LlmEvent;
-        if (parsed.data.type === "done" || parsed.data.type === "error") {
-          sawDone = true;
-          break;
-        }
-      }
-    } catch (err) {
-      if (signal.aborted) return;
-      throw new LlmError(
-        "LLM_STREAM_BROKEN",
-        `The LLM stream was interrupted: ${(err as Error).message}`,
-      );
+    const data = (await res.json()) as {
+      answer: string;
+      query?: string | object;
+      query_kind?: string;
+      row_count?: number;
+      report_id?: string;
+      is_edit?: boolean;
+    };
+
+    if (signal.aborted) return;
+
+    // 1. Synthesize the SQL block (if the LLM generated a query)
+    if (data.query) {
+      yield {
+        type: "sql",
+        sql: typeof data.query === "string" ? data.query : JSON.stringify(data.query),
+        dialect: data.query_kind,
+      };
     }
-    if (!sawDone && !signal.aborted) {
-      throw new LlmError(
-        "LLM_STREAM_BROKEN",
-        "The LLM stream ended unexpectedly",
-      );
-    }
+
+    // 2. Synthesize the text answer (yielded as one large delta)
+    yield { type: "delta", text: data.answer ?? "" };
+
+    // 3. Synthesize the done event with metadata for the UI
+    yield {
+      type: "done",
+      usage: {
+        row_count: data.row_count,
+        report_id: data.report_id,
+        query: data.query,
+        query_kind: data.query_kind,
+        is_edit: data.is_edit,
+      },
+    };
   }
 
+  // ── Connections ───────────────────────────────────────────────────────
   testConnection(
     conn: Omit<LlmConnection, "id" | "name">,
     signal?: AbortSignal,
   ): Promise<ConnectionTestResult> {
     return this.post<ConnectionTestResult>(
-      "/api/v1/connection/test",
+      "/api/v1/connections/test",             // ← Fixed: plural "connections"
       { connection: conn },
       signal,
     );
   }
 
+  // ── Schema ────────────────────────────────────────────────────────────
+  getSchema(
+    conn: Omit<LlmConnection, "id" | "name">,
+    signal?: AbortSignal,
+  ): Promise<{ tables: SchemaTable[] }> {
+    // Note: FastAPI currently only has /api/v1/schema/index (which indexes, not fetches).
+    // If you need a fetch endpoint, it must be added to FastAPI.
+    return this.post<{ tables: SchemaTable[] }>(
+      "/api/v1/schema/index",
+      { connection_id: (conn as any).connection_id ?? "" },
+      signal,
+    );
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────────
   createReport(
     body: {
       connection_id: string;
-      query: string;
+      query: string | object;
       format: "csv" | "xlsx";
       title?: string;
     },
     signal?: AbortSignal,
   ): Promise<{ reportId: string; status: string }> {
-    return this.post("/v1/reports", body, signal);
+    // Note: FastAPI requires X-User-Id and X-Organization-Id headers
+    // for the /reports endpoint. It's better to proxy this from a Fastify route
+    // instead of the internal HttpLlmClient.
+    return this.post("/api/v1/reports", body, signal);
   }
 
   getReportStatus(
@@ -252,23 +283,11 @@ export class HttpLlmClient implements LlmClient {
     error?: string;
     created_at: string;
   }> {
-    // post() only does POST, so add a small GET helper or use fetch directly
-    return this.get(`/v1/reports/${reportId}`, signal);
+    return this.get(`/api/v1/reports/${reportId}`, signal);
   }
 
   downloadReportUrl(reportId: string): string {
-    return `${this.base}/v1/reports/${reportId}/download`;
-  }
-
-  getSchema(
-    conn: Omit<LlmConnection, "id" | "name">,
-    signal?: AbortSignal,
-  ): Promise<{ tables: SchemaTable[] }> {
-    return this.post<{ tables: SchemaTable[] }>(
-      "/api/v1/connection/schema",
-      { connection: conn },
-      signal,
-    );
+    return `${this.base}/api/v1/reports/${reportId}/download`;
   }
 }
 

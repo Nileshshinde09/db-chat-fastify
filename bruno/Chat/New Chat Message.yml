@@ -1,0 +1,26 @@
+info:
+  name: New Chat Message
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/conversations/6adc452590c7b7e60b63e22c/messages?stream=true"
+  headers:
+    - name: authorization
+      value: Bearer {{accessToken}}
+  params:
+    - name: stream
+      value: "true"
+      type: query
+  body:
+    type: json
+    data: '{"content": "what is my last query asked?"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

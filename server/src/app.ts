@@ -13,7 +13,7 @@ import conversationRoutes from "./modules/chat/conversations.routes";
 import attachmentRoutes from "./modules/chat/attachments.routes";
 import internalFileRoutes from "./modules/internal/files.routes";
 import { createLlmClient } from "./services/llm";
-import reportRoutes from "./modules/reports/reports.routes";
+import reportRoutes from "./modules/chat/reports.routes";
 
 interface ErrorLike {
   statusCode?: number;
@@ -99,7 +99,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     await app.register(devDbCleanRoutes, { prefix: "/api/dev/db/clean" });
   }
   // Database connections, chat workspace and files
-    await app.register(reportRoutes, { prefix: "/api/v1/reports" });
+await app.register(reportRoutes, { prefix: "/api/v1/reports" });
+
   await app.register(connectionRoutes, { prefix: "/api/v1/connections" });
   await app.register(conversationRoutes, { prefix: "/api/v1/conversations" });
   await app.register(attachmentRoutes, { prefix: "/api/v1/attachments" });

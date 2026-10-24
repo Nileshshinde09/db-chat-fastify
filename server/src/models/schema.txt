@@ -1,0 +1,356 @@
+import { Schema, model, type Types } from 'mongoose';
+
+export const ATTACHMENT_KINDS = ['csv', 'xlsx'] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+export interface SheetPreview {
+  name: string;
+  columns: string[];
+  rowCount: number;
+  sampleRows: unknown[][];
+}
+
+export interface IAttachment {
+  _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  userId: Types.ObjectId;
+  /** Set when the file is sent with a chat message. */
+  conversationId: Types.ObjectId | null;
+  messageId: Types.ObjectId | null;
+  originalName: string;
+  kind: AttachmentKind;
+  size: number;
+  storageKey: string;
+  /** JSON text of { sheets: SheetPreview[] } (sample rows are arrays of arrays). */
+  previewJson: string;
+  createdAt: Date;
+}
+
+const attachmentSchema = new Schema<IAttachment>(
+  {
+    orgId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation', default: null },
+    messageId: { type: Schema.Types.ObjectId, ref: 'Message', default: null },
+    originalName: { type: String, required: true },
+    kind: { type: String, enum: ATTACHMENT_KINDS, required: true },
+    size: { type: Number, required: true },
+    storageKey: { type: String, required: true },
+    previewJson: { type: String, default: '{"sheets":[]}' },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
+attachmentSchema.index({ orgId: 1, userId: 1, messageId: 1 });
+attachmentSchema.index({ conversationId: 1 });
+
+export const Attachment = model<IAttachment>('Attachment', attachmentSchema);
+import { Schema, model, type Types } from "mongoose";
+
+export const DEFAULT_TITLE = "New chat";
+
+export interface IConversation {
+  _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  userId: Types.ObjectId;
+  title: string;
+  /** "default" -> may be auto-titled, "auto" -> already auto-titled, "user" -> renamed by the user. */
+  titleSource: "default" | "auto" | "user";
+  /** The database this chat currently talks to. Can be switched at any time. */
+  connectionId: Types.ObjectId | null;
+  connectionName: string | null;
+  pinned: boolean;
+  archived: boolean;
+  messageCount: number;
+  lastMessageAt: Date;
+  /** Set while an answer is being generated; guards against concurrent runs. */
+  activeRunAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const conversationSchema = new Schema<IConversation>(
+  {
+    orgId: { type: Schema.Types.ObjectId, ref: "Organization", required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    title: { type: String, default: DEFAULT_TITLE, trim: true, maxlength: 120 },
+    titleSource: {
+      type: String,
+      enum: ["default", "auto", "user"],
+      default: "default",
+    },
+    connectionId: {
+      type: Schema.Types.ObjectId,
+      ref: "DbConnection",
+      default: null,
+    },
+    connectionName: { type: String, default: null },
+    pinned: { type: Boolean, default: false },
+    archived: { type: Boolean, default: false },
+    messageCount: { type: Number, default: 0 },
+    lastMessageAt: { type: Date, default: () => new Date() },
+    activeRunAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+
+conversationSchema.index({
+  orgId: 1,
+  userId: 1,
+  archived: 1,
+  lastMessageAt: -1,
+});
+conversationSchema.index({ orgId: 1, connectionId: 1 });
+
+export const Conversation = model<IConversation>(
+  "Conversation",
+  conversationSchema,
+);
+import { Schema, model, type Types } from "mongoose";
+
+export const DB_TYPES = [
+  "postgres",
+  "mysql",
+  "mariadb",
+  "mssql",
+  "mongodb"
+] as const;
+export type DbType = (typeof DB_TYPES)[number];
+
+export const DEFAULT_PORTS: Record<DbType, number> = {
+  postgres: 5432,
+  mysql: 3306,
+  mariadb: 3306,
+  mssql: 1433,
+  mongodb: 27017
+};
+
+export interface IDbConnection {
+  _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  name: string;
+  description?: string;
+  type: DbType;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  /** AES-256-GCM payload of { password }. Never leaves the server except to the LLM server. */
+  credentialsEnc?: string;
+  ssl: boolean;
+  /** Tells the LLM server to run in read-only mode (strongly recommended). */
+  readOnly: boolean;
+  /** Non-secret driver options, e.g. { authSource: "admin" }. */
+  options: Record<string, string | number | boolean>;
+  createdBy: Types.ObjectId;
+  updatedBy: Types.ObjectId;
+  lastTestedAt?: Date;
+  lastTestStatus?: "ok" | "failed";
+  lastTestMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const dbConnectionSchema = new Schema<IDbConnection>(
+  {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
+    name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    type: { type: String, enum: DB_TYPES, required: true },
+    host: { type: String, required: true, trim: true },
+    port: { type: Number, required: true },
+    database: { type: String, required: true, trim: true },
+    username: { type: String, default: "" },
+    credentialsEnc: { type: String, select: false },
+    ssl: { type: Boolean, default: false },
+    readOnly: { type: Boolean, default: true },
+    options: { type: Schema.Types.Mixed, default: {} },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    updatedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    lastTestedAt: { type: Date },
+    lastTestStatus: { type: String, enum: ["ok", "failed"] },
+    lastTestMessage: { type: String },
+  },
+  { timestamps: true },
+);
+
+// Connection names are unique inside an organization.
+dbConnectionSchema.index({ orgId: 1, name: 1 }, { unique: true });
+
+export const DbConnection = model<IDbConnection>(
+  "DbConnection",
+  dbConnectionSchema,
+);
+import { Schema, model, type Types } from "mongoose";
+
+export interface IInvite {
+  _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  email: string;
+  role: "admin" | "member";
+  tokenHash: string;
+  invitedBy: Types.ObjectId;
+  encryptedToken: string;
+  expiresAt: Date;
+  acceptedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const inviteSchema = new Schema<IInvite>(
+  {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    role: { type: String, enum: ["admin", "member"], required: true },
+    invitedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    tokenHash: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    encryptedToken: {
+      type: String,
+      required: true,
+    },
+    expiresAt: { type: Date, required: true },
+    acceptedAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+
+// MongoDB removes the document automatically once expiresAt has passed.
+inviteSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const Invite = model<IInvite>("Invite", inviteSchema);
+
+import { Schema, model, type Types } from "mongoose";
+
+export type MessageRole = "user" | "assistant";
+export type MessageStatus = "complete" | "stopped" | "error";
+
+/** Structured output produced next to the text: generated SQL, result tables, chart specs. */
+export type MessageBlock = {
+  type: "sql" | "table" | "chart";
+  [key: string]: unknown;
+};
+
+export interface IMessage {
+  _id: Types.ObjectId;
+  conversationId: Types.ObjectId;
+  orgId: Types.ObjectId;
+  userId: Types.ObjectId;
+  role: MessageRole;
+  content: string;
+  status: MessageStatus;
+  error?: { code: string; message: string };
+  attachmentIds: Types.ObjectId[];
+  /**
+   * JSON text of MessageBlock[]. Stored as a string on purpose: result tables are arrays of
+   * arrays, and chart specs (e.g. Vega-Lite) contain "$schema"-style keys that MongoDB
+   * does not accept as field names.
+   */
+  blocksJson: string;
+  /** Which database answered (snapshot, so history stays readable if the connection is deleted). */
+  connectionId?: Types.ObjectId | null;
+  connectionName?: string | null;
+  usage?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+const messageSchema = new Schema<IMessage>(
+  {
+    conversationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true,
+    },
+    orgId: { type: Schema.Types.ObjectId, ref: "Organization", required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    role: { type: String, enum: ["user", "assistant"], required: true },
+    content: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["complete", "stopped", "error"],
+      default: "complete",
+    },
+    error: {
+      type: new Schema({ code: String, message: String }, { _id: false }),
+    },
+    attachmentIds: { type: [Schema.Types.ObjectId], default: [] },
+    blocksJson: { type: String, default: "[]" },
+    connectionId: { type: Schema.Types.ObjectId, default: null },
+    connectionName: { type: String, default: null },
+    usage: { type: Schema.Types.Mixed },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
+messageSchema.index({ conversationId: 1, _id: 1 });
+
+export const Message = model<IMessage>("Message", messageSchema);
+import { Schema, model, type Types } from "mongoose";
+
+export const ROLES = ["owner", "admin", "member"] as const;
+export type Role = (typeof ROLES)[number];
+
+export const USER_STATUSES = ["active", "disabled"] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+export interface IUser {
+  _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  email: string;
+  name: string;
+  passwordHash: string;
+  role: Role;
+  status: UserStatus;
+  lastLoginAt?: Date;
+  twoFactor: {
+    enabled: boolean;
+    secret?: string; // TODO(prod): encrypt at rest (e.g. AES-GCM with a KMS-managed key)
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const userSchema = new Schema<IUser>(
+  {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
+    // Email is globally unique: a user belongs to exactly one organization,
+    // and login only needs email + password.
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    name: { type: String, required: true, trim: true },
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: ROLES, required: true },
+    status: { type: String, enum: USER_STATUSES, default: "active" },
+    lastLoginAt: { type: Date },
+    twoFactor: {
+      enabled: { type: Boolean, default: false },
+      secret: { type: String, select: false },
+    },
+  },
+  { timestamps: true },
+);
+
+export const User = model<IUser>("User", userSchema);

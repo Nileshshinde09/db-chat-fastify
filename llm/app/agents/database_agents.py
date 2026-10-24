@@ -2,7 +2,7 @@ import json
 from langchain_core.messages import HumanMessage, SystemMessage
 from app.agents.models import sql_llm, nosql_llm
 from app.core.config import settings
-
+import re
 
 def _content(response) -> str:
     return response.content if isinstance(response.content, str) else str(response.content)
@@ -26,24 +26,50 @@ Schema:
 
 
 def generate_mongo_plan(question: str, schema_context: str) -> dict:
-    response = nosql_llm.invoke([
-        SystemMessage(content=f"""
-Return a JSON object only for a read-only MongoDB query.
-Allowed keys: collection, operation, filter, projection, sort, limit, pipeline.
-operation must be find or aggregate. Never use $out, $merge, $where, $function,
-$accumulator, or other write/code execution features. Use only the provided schema.
-Use a small limit, at most {settings.MAX_QUERY_ROWS}.
-Schema:
+    system_prompt = f"""You are a strict, expert MongoDB query generator.
+
+Schema Context:
 {schema_context[:12000]}
-"""),
+
+CRITICAL RULES:
+1. Output ONLY a valid JSON object. No markdown, no explanations, no code blocks.
+2. NEVER prefix the collection with the database name. Use "users", NOT "database-chat.users".
+3. Never use $out, $merge, $where, $function, $accumulator.
+4. Default to operation="find". Limit to {settings.MAX_QUERY_ROWS} if no limit is specified.
+
+SPECIAL INSTRUCTIONS:
+- If the user asks "how many", "count", or "total", you MUST use operation="aggregate" with this exact pipeline:
+  {{"operation": "aggregate", "collection": "users", "pipeline": [{{"$match": {{"role": "admin"}}}}, {{"$count": "total"}}]}}
+- If the user asks for a field (like gender, age, salary) that is NOT listed in the Schema Context, DO NOT GUESS. Output exactly this:
+  {{"operation": "error", "message": "The requested field does not exist in this database schema."}}
+- If the user asks about the schema itself (e.g., "how many tables", "what columns are in users"), output exactly this:
+  {{"operation": "schema_question"}}
+
+Example for find:
+{{"operation": "find", "collection": "users", "filter": {{"role": "owner"}}, "projection": {{"name": 1}}, "limit": 500}}
+
+Output the JSON now:"""
+
+    response = nosql_llm.invoke([
+        SystemMessage(content=system_prompt),
         HumanMessage(content=question[:4000]),
     ])
+    
     raw = _content(response).strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-    data = json.loads(raw)
+    
+    # Aggressive JSON extraction (handles markdown fences if the LLM ignores instructions)
+    match = re.search(r'\{[\s\S]*\}', raw)
+    if not match:
+        raise ValueError("Model did not return a JSON object")
+    
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        raise ValueError(f"Model returned invalid JSON: {raw}")
+        
     if not isinstance(data, dict):
         raise ValueError("Model did not return a JSON object")
+        
     return data
 
 

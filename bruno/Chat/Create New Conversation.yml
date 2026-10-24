@@ -1,0 +1,22 @@
+info:
+  name: Create New Conversation
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/conversations"
+  headers:
+    - name: authorization
+      value: Bearer      {{accessToken}}
+  body:
+    type: json
+    data: '{"connectionId":"6ad8e4e8c324b832d791c62d"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -45,6 +45,7 @@ export const sendMessageSchema = z
   .object({
     content: z.string().trim().min(1, 'Message cannot be empty').max(8000),
     attachmentIds: z.array(objectId).max(5).default([]),
+    reportId: objectId.optional(),
   })
   .strict();
 

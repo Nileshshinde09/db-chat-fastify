@@ -262,6 +262,7 @@ export async function prepareChat(
       connection,
       files,
       options: { readOnly: true, rowLimit: env.CHAT_ROW_LIMIT },
+      reportId: input.reportId,
     };
     // Honor the per-connection read-only flag (defaults to true when unknown).
     if (connection) {

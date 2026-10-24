@@ -1,0 +1,55 @@
+info:
+  name: "Login "
+  type: http
+  seq: 4
+  tags:
+    - smoke
+    - regression
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{ownerAEmail}}",
+        "password": "{{testPassword}}"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // The refresh cookie is captured and re-sent explicitly, so these tests do
+        // not depend on a cookie jar and can replay old tokens on purpose.
+        const raw = res.getHeader('set-cookie') || res.headers['set-cookie'];
+        const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const cookie = list.find((c) => c.startsWith('refresh_token='));
+        bru.setVar('ownerARefresh', cookie ? cookie.split(';')[0].split('=')[1] : '');
+
+        bru.setVar('ownerAToken', res.body.accessToken);
+    - type: tests
+      code: |-
+        test("returns tokens and the user", function () {
+          expect(res.body.accessToken).to.be.a('string').and.not.empty;
+          expect(res.body.user.email).to.equal(bru.getVar('ownerAEmail'));
+          expect(res.body.user.role).to.equal('owner');
+        });
+        test("records last login", function () {
+          expect(res.body.user.lastLoginAt).to.not.equal(null);
+        });
+        test("does not need an OTP while 2FA is off", function () {
+          expect(res.body.code).to.equal(undefined);
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

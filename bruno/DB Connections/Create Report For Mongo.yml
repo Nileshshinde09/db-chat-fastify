@@ -19,30 +19,22 @@ http:
     type: json
     data: |-
       {
-        "connection": {
-          "type": "mongodb",
-          "host": "localhost",
-          "port": 27017,
-          "database": "database-chat",
-          "username": "",
-          "password": "",
-          "ssl": false,
-          "options": {}
-        },
         "connectionId": "6ad8e4e8c324b832d791c62d",
         "orgId": "6ad63672a28566425b822f0e",
         "userId": "6ad63673a28566425b822f0f",
         "query": {
+          "collection": "database-chat.organizations",
           "operation": "find",
-          "collection": "users",
           "filter": {},
           "projection": {
-            "name": 1,
-            "email": 1
-          }
+            "ownerId": 1,
+            "_id": 1
+          },
+          "sort": {},
+          "limit": 500
         },
-        "format": "csv",
-        "title": "Users"
+          "format": "csv",
+          "title": "Users"
       }
   auth: inherit
 

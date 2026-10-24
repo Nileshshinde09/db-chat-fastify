@@ -19,7 +19,7 @@ http:
       {
           "threadId": "t1",
           "connectionId": "6ad8e4e8c324b832d791c62d",
-          "message": "give me list of users"
+          "message": "remove name,createdAt,updatedAt and just give me ownerid and _id"
         }
   auth: inherit
 

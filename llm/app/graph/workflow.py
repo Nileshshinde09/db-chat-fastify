@@ -18,7 +18,7 @@ from app.graph.state import ChatState
 from app.models.connection import ConnectionConfig
 from app.rag.retriever import retrieve_schema
 from app.services.connection_loader import load_connection
-from app.services.db_executor import execute_select, ExecutionError
+from app.services.db_executor import ExecutionError
 from app.services.mongo_executor import execute_mongo
 
 logger = logging.getLogger(__name__)
@@ -143,24 +143,29 @@ async def execute_node(state: dict, config: RunnableConfig) -> dict:
         if cfg.type == "mongodb":
             plan = state.get("mongo_plan") or {}
             if not plan:
+                return {"query_error": "No query plan was generated.", "query_result": {"columns": [], "rows": [], "row_count": 0}}
+
+            # ── NEW: Intercept special operations ──────────────────────
+            op = plan.get("operation")
+            if op == "error":
                 return {
-                    "query_error": "No query plan was generated.",
+                    "query_error": plan.get("message", "Invalid query"),
                     "query_result": {"columns": [], "rows": [], "row_count": 0},
                 }
+            if op == "schema_question":
+                # Just return the schema context as a fake result so the summarize node answers it
+                return {
+                    "query_error": "",
+                    "query_result": {
+                        "columns": ["schema"],
+                        "rows": [[state.get("schema_context", "No schema available")]],
+                        "row_count": 1,
+                    },
+                }
+            # ───────────────────────────────────────────────────────────
+
             columns, rows, truncated = await execute_mongo(
                 cfg, plan,
-                max_rows=settings.MAX_QUERY_ROWS,
-                timeout_s=settings.QUERY_TIMEOUT_SECONDS,
-            )
-        else:
-            sql = state.get("generated_query") or ""
-            if not sql:
-                return {
-                    "query_error": "No SQL was generated.",
-                    "query_result": {"columns": [], "rows": [], "row_count": 0},
-                }
-            columns, rows, truncated = await execute_select(
-                cfg, sql,
                 max_rows=settings.MAX_QUERY_ROWS,
                 timeout_s=settings.QUERY_TIMEOUT_SECONDS,
             )
