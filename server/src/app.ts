@@ -82,8 +82,8 @@ export async function buildApp(): Promise<FastifyInstance> {
       });
     }
 
-    // Framework errors such as rate limiting (429), malformed JSON (400), etc.
-    return reply.status(statusCode).send({
+  // Framework errors such as rate limiting (429), malformed JSON (400), etc.
+  return reply.status(statusCode).send({
       statusCode,
       code: typeof err.code === "string" ? err.code : "ERROR",
       message: err.message ?? "Request failed",
@@ -99,7 +99,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await app.register(devDbCleanRoutes, { prefix: "/api/dev/db/clean" });
   }
   // Database connections, chat workspace and files
-await app.register(reportRoutes, { prefix: "/api/v1/reports" });
+  await app.register(reportRoutes, { prefix: "/api/v1/reports" });
 
   await app.register(connectionRoutes, { prefix: "/api/v1/connections" });
   await app.register(conversationRoutes, { prefix: "/api/v1/conversations" });

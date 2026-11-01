@@ -6,7 +6,6 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-
 from app.core.config import settings
 from app.core.security import UserContext, get_current_user
 from app.graph.workflow import build_graph

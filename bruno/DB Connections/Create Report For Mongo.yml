@@ -23,19 +23,16 @@ http:
         "orgId": "6ad63672a28566425b822f0e",
         "userId": "6ad63673a28566425b822f0f",
         "query": {
-                "type": "plan",
-                "plan": {
-                  "operation": "find",
-                  "collection": "organizations",
-                  "filter": {},
-                  "projection": {
-                    "name": 1
-                  },
-                  "limit": 500
-                }
-              },
+          "operation": "find",
+          "collection": "organizations",
+          "filter": {},
+          "projection": {
+            "name": 1
+          },
+          "limit": 500
+        },
           "format": "csv",
-          "title": "Users"
+          "title": "Company names"
       }
   auth: inherit
 
